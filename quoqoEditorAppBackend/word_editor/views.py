@@ -22,13 +22,26 @@ def extract_email_hyperlinks(run):
     email_links = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
     return email_links
 
-def apply_format(run, style):
-    if style == 'BOLD':
-        run.bold = True
-    elif style == 'ITALIC':
-        run.italic = True
-    elif style == 'UNDERLINE':
-        run.underline = True
+def apply_format(run, styles):
+    for style in styles:
+        if style == 'BOLD':
+            run.bold = True
+        if style == 'ITALIC':
+            run.italic = True
+        if style == 'UNDERLINE':
+            run.underline = True
+
+def getStylingByChar(length,inlineStyleRanges):
+    charStyle = [[] for _ in range(length)]
+    for i in range(length):
+        for inline_style in inlineStyleRanges:
+            start = inline_style['offset']
+            end = start + inline_style['length']
+            if start <= i and i< end:
+                charStyle[i].append(inline_style['style'])
+    return charStyle
+
+
 
 def generate_docx_from_html_content(request):
     data = json.loads(request.body.decode('utf-8'))
@@ -38,20 +51,15 @@ def generate_docx_from_html_content(request):
     for block in html_content['blocks']:
         text = block['text']
         paragraph = doc.add_paragraph()
-
         if 'inlineStyleRanges' in block and block['inlineStyleRanges']:
             inlineStyleRanges = block['inlineStyleRanges']
-            offset = inlineStyleRanges[0]['offset']
-            length = inlineStyleRanges[0]['length']
-            run = paragraph.add_run(text[offset:offset + length])
-            for inline_style in inlineStyleRanges:
-                style = inline_style['style']
-                apply_format(run, style)
-            remaining_text = text[length:]
-            if remaining_text:
-                run = paragraph.add_run(remaining_text)
+            charStyle = getStylingByChar(len(text),inlineStyleRanges)
+            print(charStyle)
+            for i in range(len(charStyle)):
+                run = paragraph.add_run(text[i:i+1])
+                apply_format(run, charStyle[i])
         else:
-            run = paragraph.add_run(text)
+            paragraph.add_run(text)
 
     for paragraph in doc.paragraphs:
         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
